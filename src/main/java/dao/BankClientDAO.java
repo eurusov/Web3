@@ -2,8 +2,11 @@ package dao;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import com.sun.istack.internal.NotNull;
+import com.sun.istack.internal.Nullable;
 import model.BankClient;
 
 public class BankClientDAO implements AutoCloseable {
@@ -15,11 +18,12 @@ public class BankClientDAO implements AutoCloseable {
     }
 
     /**
-     * Возвращает список всех клиентов в таблице, или пустой List - если таблица пуста.
+     * Возвращает список всех клиентов из таблицы, или пустой список - если таблица пуста.
      *
-     * @return List of BankClient objects.
+     * @return <tt>List of BankClient</tt>
      */
-    public List<BankClient> getAllBankClient() throws SQLException { /* was blank */
+    public @NotNull
+    List<BankClient> getAllBankClient() throws SQLException {
 
         try (Statement stmt = connection.createStatement();
              ResultSet result = stmt.executeQuery("SELECT * FROM bank_client")
@@ -35,17 +39,16 @@ public class BankClientDAO implements AutoCloseable {
                 );
                 clientsList.add(client);
             }
-            return clientsList;
+            return (clientsList.isEmpty()) ? Collections.emptyList() : clientsList;
         }
     }
 
     /**
-     * Проверяет, есть ли клиент с таким именем и паролем в базе.
+     * Проверяет, есть ли клиент с таким именем и паролем в таблице.
      *
      * @param name     имя клиента.
      * @param password пароль клиента.
-     * @return true - если клиент с таким именем и паролем существует в таблице,
-     * false - в случае если такой клиент не найден.
+     * @return <code>true</code> - если клиент с таким именем и паролем существует в таблице
      */
     public boolean validateClient(final String name, final String password)
             throws SQLException {
@@ -57,35 +60,21 @@ public class BankClientDAO implements AutoCloseable {
         return client != null;
     }
 
-//    public boolean validateClient(final String name, final String password)
-//            throws SQLException {
-//        try (PreparedStatement stmt = connection.prepareStatement(
-//                "SELECT * FROM bank_client WHERE name=? AND password=?"
-//        )
-//        ) {
-//            stmt.setString(1, name);
-//            stmt.setString(2, password);
-//
-//            try (ResultSet resultSet = stmt.executeQuery()) {
-//                return resultSet.next();
-//            }
-//        }
-//    }
-//
-
     /**
-     * Вспомогательный метод.
-     * Выполняет SQL запрос, и если результат содержит хотя бы одного клиента,
-     * то возвращает первого, иначе - null.
-     * В логике данной программы предполагается, что корректный запрос для данного метода
-     * должен вернуть результат состоящий только из одной записи или пустой результат.
-     * В противном случае возвращается BankClient соответствующий первой записи из ResultSet.
+     * Вспомогательный метод.<p>Выполняет SQL запрос с параметрами,
+     * и если результат содержит хотя бы одного клиента,
+     * то возвращает первого, иначе - <code>null</code>.
+     * <p>В логике данной программы предполагается, что корректный запрос для данного метода
+     * должен возвращать результат состоящий только из одной записи или пустой результат.
+     * <p>В противном случае возвращается <code>BankClient</code> соответствующий первой записи из <code>ResultSet</code>.
      *
-     * @param sql строка содержащая SQL запрос.
-     * @return объект BankClient, найденный в таблице по данному SQL запросу,
-     * или null если результат запроса пуст.
+     * @param sql  строка содержащая SQL запрос
+     * @param args подстановочные параметры для запроса
+     * @return объект <code>BankClient</code>, найденный в таблице по данному SQL запросу,
+     * или <code>null</code> если результат запроса пуст
      */
-    private BankClient getClientBySqlQuery(final String sql, final String... args)
+    private @Nullable
+    BankClient getClientBySqlQuery(final String sql, final String... args)
             throws SQLException {
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             for (int i = 0; i < args.length; i++) {
@@ -128,68 +117,31 @@ public class BankClientDAO implements AutoCloseable {
         if (validateClient(name, password)) {
 
             BankClient client = getClientByName(name);
-            long money = client.getMoney() + transactValue;
+            long finalAmount = client.getMoney() + transactValue;
 
-            if (money >= 0) {
+            if (finalAmount >= 0) {
                 try (PreparedStatement stmt = connection.prepareStatement(
                         "UPDATE bank_client SET money=? WHERE id=?")
                 ) {
-                    stmt.setLong(1, money);
+                    stmt.setLong(1, finalAmount);
                     stmt.setLong(2, client.getId());
                     updatedRows = stmt.executeUpdate();
                 }
             }
         }
-        // подумать, что с этим делать
-        if (updatedRows != 1) {
+        if (updatedRows != 1) { // TODO: подумать, что с этим делать
             throw new IllegalStateException("Error while updating clients money!");
         }
     }
 
     /**
-     * Осуществляет перевод денег от одного клиента другому.
+     * Возвращает клиента по его <i>id</i>, или <code>null</code> если такого клиента нет.
      *
-     * <p>Выполняет перевод за один <tt>executeBatch</tt>
-     *
-     * @throws IllegalStateException в случае, если количество измененных
-     *                               строк в таблице в результате данной операции не равно 2
+     * @param id <i>id</i> клиента
+     * @return объект <code>BankClient</code> или <code>null</code> если такого клиента нет
      */
-    public void doMoneyTransfer(final BankClient from, final BankClient to, final long sum) throws SQLException {
-        if (validateClient(from.getName(), from.getPassword())
-                && validateClient(to.getName(), to.getPassword())
-                && isClientHasSum(from.getName(), sum)) {
-
-            boolean autocmt = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-
-            Statement stmt = connection.createStatement();
-            stmt.addBatch("UPDATE bank_client"
-                    + " SET money=" + (from.getMoney() - sum)
-                    + " WHERE id=" + from.getId()
-            );
-            stmt.addBatch("UPDATE bank_client"
-                    + " SET money=" + (to.getMoney() + sum)
-                    + " WHERE id=" + to.getId()
-            );
-
-            int[] updatedRows = stmt.executeBatch();
-            connection.commit();
-            stmt.close();
-            connection.setAutoCommit(autocmt);
-
-            if (updatedRows.length < 2 || updatedRows[0] != 1 || updatedRows[1] != 1) {
-                throw new IllegalStateException("Error while updating clients money!");
-            }
-        }
-    }
-
-    /**
-     * Возвращает клиента по его id или null если такого клиента нет.
-     *
-     * @param id id клиента
-     * @return объект BankClient или null если такого клиента нет
-     */
-    public BankClient getClientById(final Long id) throws SQLException {  /* was blank */
+    public @Nullable
+    BankClient getClientById(final Long id) throws SQLException {
         return getClientBySqlQuery("SELECT * FROM bank_client WHERE id=?", id.toString());
     }
 
@@ -198,8 +150,7 @@ public class BankClientDAO implements AutoCloseable {
      *
      * @param name        имя клиента
      * @param expectedSum ожидаемая сумма
-     * @return false, если сумма на счете клиента меньше указанной или такого клиента нет,
-     * иначе - true
+     * @return <code>true</code>, если такой клиент есть, и сумма на его счете не меньше <code>expectedSum</code>
      */
     public boolean isClientHasSum(final String name, final long expectedSum) throws SQLException {
         BankClient client = getClientByName(name);
@@ -207,37 +158,39 @@ public class BankClientDAO implements AutoCloseable {
     }
 
     /**
-     * Возвращает id клиента по его имени или null если такого клиента нет.
+     * Возвращает <i>id</i> клиента по его имени, или <code>null</code> если такого клиента нет.
      *
      * @param name имя клиента
-     * @return id клиента или null если такого клиента нет
+     * @return <i>id</i> клиента или <tt>null</tt> если такого клиента нет
      */
-    public Long getClientIdByName(final String name) throws SQLException {
+    public @Nullable
+    Long getClientIdByName(final String name) throws SQLException {
         BankClient client = getClientByName(name);
         return (client != null) ? client.getId() : null;
     }
 
     /**
-     * Возвращает клиента по его имени или null если такого клиента нет.
+     * Возвращает клиента по его имени или <code>null</code>  если такого клиента нет.
      *
      * @param name имя клиента
-     * @return объект BankClient или null если такого клиента нет
+     * @return объект <code>BankClient</code> или <code>null</code> если такого клиента нет
      */
-    public BankClient getClientByName(final String name) throws SQLException {
+    public @Nullable
+    BankClient getClientByName(final String name) throws SQLException {
         return getClientBySqlQuery("SELECT * FROM bank_client WHERE name=?", name);
     }
 
     /**
      * Добавляет клиента в таблицу.
      *
-     * @param client объект BankClient
+     * @param client объект <code>BankClient</code>
      * @throws IllegalStateException в случае, если количество измененных
      *                               строк в таблице в результате данной операции не равно 1
      */
     public void addClient(final BankClient client) throws SQLException {
         int updatesCount = 0;
-        // возможно здесь надо убрать излишнюю проверку на присутствие клиента в таблице
-        if (getClientByName(client.getName()) == null) {
+
+        if (getClientByName(client.getName()) == null) { //TODO: возможно здесь надо убрать излишнюю проверку на присутствие клиента в таблице
             try (PreparedStatement stmt = connection.prepareStatement(
                     "INSERT INTO bank_client (name, password, money) values (?, ?, ?)")
             ) {
@@ -247,23 +200,24 @@ public class BankClientDAO implements AutoCloseable {
                 updatesCount = stmt.executeUpdate();
             }
         }
-        // подумать, что с этим делать
-        if (updatesCount != 1) {  // Если изменена не 1 строка в таблице, то что-то пошло не так.
+
+        if (updatesCount != 1) { //TODO: подумать, что с этим делать
+            // Если изменена не 1 строка в таблице, то что-то пошло не так
             throw new IllegalStateException("Error while adding client!");
         }
     }
 
     public void deleteClient(final String name) throws SQLException {
         int updatedRows = 0;
-        // возможно здесь надо убрать излишнюю проверку на отсутствие клиента в таблице
-        if (getClientByName(name) != null) {
-            try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM bank_client WERE name='?'")) {
+
+        if (getClientByName(name) != null) { //TODO: возможно здесь надо убрать излишнюю проверку на отсутствие клиента в таблице
+            try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM bank_client WHERE name='?'")) {
                 stmt.setString(1, name);
                 updatedRows = stmt.executeUpdate();
             }
         }
-        // подумать, что с этим делать
-        if (updatedRows != 1) {  // Если изменена не 1 строка в таблице, то что-то пошло не так.
+        if (updatedRows != 1) { //TODO: подумать, что с этим делать
+            // Если изменена не 1 строка в таблице, то что-то пошло не так.
             throw new IllegalStateException("Error while deleting client!");
         }
     }
