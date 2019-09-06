@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web3-transaction</title>
+</head>
+<body>
+<table style="align-content: center; border: 0 ;" cellpadding="20" cellspacing="10" align="center">
+    <tr>
+        <td style="border: 1px solid lightgray; text-align: right">
+            <form action="/transaction" method="POST" autocomplete="off">
+                <p>
+                    <label>Sender Name
+                        <input type="text" autofocus required name="senderName">
+                    </label>
+                </p>
+                <p>
+                    <label>Password
+                        <input type="password" required name="senderPass">
+                    </label>
+                </p>
+                <p>
+                    <label> Amount to transfer
+                        <input type="number" min=1 max=9223372036854775807 required name="count">
+                    </label>
+                </p>
+                <p>
+                    <label> Recipient
+                        <input type="text" autofocus required name="nameTo">
+                    </label>
+                </p>
+                <input type="submit" value="Submit">
+            </form>
+        </td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid lightgray; text-align: center;">
+            <p>
+                <a href="/registration">Registration</a>
+            </p>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

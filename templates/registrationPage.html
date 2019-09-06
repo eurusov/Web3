@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web3-registration</title>
+</head>
+<body>
+<table style="align-content: center; border: 0 ;" cellpadding="20" cellspacing="10" align="center">
+    <tr>
+    <td style="border: 1px solid lightgray; text-align: right">
+        <form action="/registration" method="POST" autocomplete="off">
+            <p>
+                <label>Name
+                    <input type="text" autofocus required name="name">
+                </label>
+            </p>
+            <p>
+                <label>Password
+                    <input type="password" required name="password">
+                </label>
+            </p>
+            <p>
+                <label> Money
+                    <input type="number" min=1 max=9223372036854775807 required name="money">
+                </label>
+            </p>
+            <input type="submit" value="Submit">
+        </form>
+    </td>
+    </tr>
+    <tr>
+    <td style="border: 1px solid lightgray; text-align: center;">
+        <p>
+            <a href="/transaction">Transaction</a>
+        </p>
+    </td>
+    </tr>
+</table>
+</body>
+</html>
